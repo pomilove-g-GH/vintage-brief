@@ -7,6 +7,17 @@ Vintage Daily Digest — 로컬 개발 서버
 접속: http://localhost:4322
 """
 import os, json, subprocess, datetime, re, sys, secrets, functools, shutil
+
+# 한글 우선 첫 줄 추출 (영문 번역 제목 회피)
+_HANGUL_RE = re.compile(r"[가-힣ᄀ-ᇿ㄰-㆏]")
+def pick_summary(desc, max_len=200):
+    if not desc:
+        return ""
+    lines = [l.strip() for l in str(desc).split("\n") if l.strip()]
+    for line in lines:
+        if _HANGUL_RE.search(line):
+            return line[:max_len]
+    return (lines[0] if lines else "")[:max_len]
 from flask import Flask, request, jsonify, send_from_directory, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -473,7 +484,7 @@ def api_update():
                 v["pubDate"] = f"{raw_date[:4]}년 {int(raw_date[4:6])}월 {int(raw_date[6:8])}일"
             desc = info.get("description") or ""
             if desc and not v.get("summary"):
-                v["summary"] = desc.strip().split("\n")[0][:200]
+                v["summary"] = pick_summary(desc)
     except Exception:
         pass
 
