@@ -663,20 +663,44 @@ def api_resummarize():
                 cur = v.get("summary", "")
                 if cur and not force:
                     continue
+                results["processed"] += 1
                 title = v.get("title", "")
-                # 자막만 시도 (description 은 이미 적용된 fallback 일 수 있음)
+                # 1) 자막 시도
                 transcript = fetch_transcript(vid)
-                src = transcript or ""
-                if not src and force:
-                    # description 도 시도하려면 별도 fetch 필요 — 생략하고 fallback 유지
-                    continue
-                new_sum = summarize_with_claude(src, title) if src else None
+                new_sum = None
+                if transcript:
+                    new_sum = summarize_with_claude(transcript, title)
+                    if new_sum:
+                        print(f"[resum] {vid} via transcript ({len(transcript)} chars)", flush=True)
+                # 2) 자막 실패 시 — yt-dlp 로 description 가져와 시도
+                if not new_sum:
+                    try:
+                        cmd = [
+                            sys.executable, "-m", "yt_dlp",
+                            f"https://www.youtube.com/watch?v={vid}",
+                            "--dump-json", "--skip-download",
+                            "--no-warnings", "--ignore-errors",
+                        ]
+                        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=30)
+                        for line in r.stdout.splitlines():
+                            try:
+                                info = json.loads(line)
+                                desc = info.get("description") or ""
+                                if desc:
+                                    new_sum = summarize_with_claude(desc, title)
+                                    if new_sum:
+                                        print(f"[resum] {vid} via description ({len(desc)} chars)", flush=True)
+                                    break
+                            except Exception:
+                                continue
+                    except Exception as e:
+                        print(f"[resum] {vid} ytdlp error: {e}", flush=True)
                 if new_sum:
                     v["summary"] = new_sum
                     changed = True
-                results["processed"] += 1
-                if new_sum:
                     results["updated"] += 1
+                else:
+                    print(f"[resum] {vid} no summary produced", flush=True)
             if changed:
                 _write_json(fpath, arr)
         except Exception as e:
