@@ -406,6 +406,14 @@
       </div>
 
       <div class="sb-scroll">
+        <a class="sb-trash-link" id="sbHome" href="#recent" style="margin-bottom: 14px;">
+          <span class="ti-icon">🆕</span>
+          <span class="ti-main">
+            <span class="ti-label">신규 큐레이션</span>
+            <span class="ti-sub">홈</span>
+          </span>
+          <span class="ti-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg></span>
+        </a>
         <div class="sb-seclabel">주제 카테고리</div>
         <nav id="sbTopics" aria-label="토픽 선택"></nav>
 
@@ -646,8 +654,15 @@
       document.getElementById('brandSub').textContent = (M.site && M.site.subtitle) || '';
     }
 
+    function clearSpecialActive() {
+      ['sbHome', 'sbTrash', 'sbLikes'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+      });
+    }
     function selectTopic(topicId) {
       state.topic = topicId;
+      clearSpecialActive();
       renderTopics();
       loadViewer();
       writeHash();
@@ -684,9 +699,9 @@
       }
       vw.src = 'pages/trash.html?theme=' + state.theme + '&role=' + cu1.role + (cu1.id ? '&uid=' + encodeURIComponent(cu1.id) : '');
       state.topic = null;
+      clearSpecialActive();
       renderTopics();
       try { document.getElementById('sbTrash').classList.add('active'); } catch (e) {}
-      try { document.getElementById('sbLikes').classList.remove('active'); } catch (e) {}
     }
 
     document.getElementById('sbTrash').addEventListener('click', function (e) {
@@ -703,8 +718,8 @@
       var cu2 = window.CURRENT_USER || { role: 'anonymous', id: null };
       vw.src = 'pages/likes.html?theme=' + state.theme + '&role=' + cu2.role + (cu2.id ? '&uid=' + encodeURIComponent(cu2.id) : '');
       state.topic = null;
+      clearSpecialActive();
       renderTopics();
-      try { document.getElementById('sbTrash').classList.remove('active'); } catch (e) {}
       try { document.getElementById('sbLikes').classList.add('active'); } catch (e) {}
     }
 
@@ -762,9 +777,28 @@
     function writeHash() {
       if (state.topic) history.replaceState(null, '', '#/' + state.topic);
     }
+    function loadRecentView() {
+      var loader = document.getElementById('loader');
+      var vw = document.getElementById('viewer');
+      loader.classList.remove('hidden');
+      loader.querySelector('span').textContent = '신규 큐레이션 불러오는 중…';
+      var cu = window.CURRENT_USER || { role: 'anonymous', id: null };
+      vw.src = 'pages/recent.html?theme=' + state.theme + '&role=' + cu.role + (cu.id ? '&uid=' + encodeURIComponent(cu.id) : '');
+      state.topic = null;
+      clearSpecialActive();
+      renderTopics();
+      try { document.getElementById('sbHome').classList.add('active'); } catch (e) {}
+    }
+    document.getElementById('sbHome').addEventListener('click', function (e) {
+      e.preventDefault();
+      history.replaceState(null, '', '#recent');
+      loadRecentView();
+    });
+
     function readHash() {
       if (location.hash === '#trash') { loadTrashView(); return true; }
       if (location.hash === '#likes') { loadLikesView(); return true; }
+      if (location.hash === '#recent') { loadRecentView(); return true; }
       var m = (location.hash || '').match(/^#\/([a-z0-9-]+)$/i);
       if (m && getTopic(m[1])) { state.topic = m[1]; return true; }
       return false;
@@ -787,9 +821,9 @@
 
       renderChrome();
       if (!readHash()) {
-        state.topic = M.topics[0].id;
-        loadViewer();
-        writeHash();
+        // 기본 진입 — 신규 큐레이션 (홈) 페이지
+        history.replaceState(null, '', '#recent');
+        loadRecentView();
       } else if (state.topic) {
         loadViewer();
       }

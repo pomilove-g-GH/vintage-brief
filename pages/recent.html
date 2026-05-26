@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>신규 큐레이션 — Vintage Daily Digest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/digest.css">
+  <script src="../manifest.js"></script>
+</head>
+<body class="topic-brown">
+  <main class="page">
+
+    <header class="page-hero">
+      <div class="hero-pill">🆕 홈</div>
+      <h1 class="hero-title"><span class="hero-emoji">🆕</span>신규 큐레이션</h1>
+    </header>
+
+    <div id="recentList" aria-label="최근 영상 목록"></div>
+
+    <footer class="page-foot">
+      Vintage Daily Digest · 좌측 사이드바에서 주제 카테고리 선택 시 전체 아카이브 열람 가능
+    </footer>
+  </main>
+
+  <script src="../assets/page.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var PER_TOPIC = 1;
+      var manifest = window.DIGEST_MANIFEST || { topics: [] };
+
+      function escapeHtml(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+
+      // 사이드바 저장 순서
+      var savedOrder = null;
+      try {
+        var raw = localStorage.getItem("vintage-topic-order");
+        var parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) savedOrder = parsed;
+      } catch (e) {}
+      var ordered = manifest.topics.slice();
+      if (savedOrder) {
+        ordered.sort(function (a, b) {
+          var ai = savedOrder.indexOf(a.id), bi = savedOrder.indexOf(b.id);
+          if (ai === -1 && bi === -1) return 0;
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return ai - bi;
+        });
+      }
+
+      function loadTopic(topic) {
+        return fetch("../" + topic.dataFile + "?ts=" + Date.now(), { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .catch(function () { return []; });
+      }
+
+      function pickRecent(arr) {
+        var copy = (Array.isArray(arr) ? arr : []).slice();
+        copy.sort(function (a, b) {
+          var aa = a.addedAt || "", bb = b.addedAt || "";
+          return bb.localeCompare(aa);
+        });
+        return copy.slice(0, PER_TOPIC);
+      }
+
+      function render() {
+        var host = document.getElementById("recentList");
+        host.innerHTML = '<div class="empty-state"><p>불러오는 중…</p></div>';
+
+        Promise.all(ordered.map(loadTopic)).then(function (results) {
+          var html = "";
+          ordered.forEach(function (t, i) {
+            var recent = pickRecent(results[i]);
+            if (!recent.length) return;
+            var num = (i + 1 < 10 ? "0" : "") + (i + 1);
+            html +=
+              '<section class="trash-topic-section topic-' + t.accent + '">' +
+                '<h2 class="section-head"><span class="section-num">' + num + '.</span> ' + escapeHtml(t.label) +
+                  '<span class="topic-pill">' + recent.length + '</span>' +
+                '</h2>' +
+                '<div class="section-rule"></div>';
+            recent.forEach(function (v) {
+              var pubDateHtml = v.pubDate ? '<span class="video-date">영상: ' + escapeHtml(v.pubDate) + '</span>' : '';
+              html +=
+                '<article class="video-card js-go-topic" data-topic="' + escapeHtml(t.id) + '" role="link" tabindex="0" style="cursor:pointer;">' +
+                  '<div class="video-thumb">' +
+                    '<img src="https://img.youtube.com/vi/' + escapeHtml(v.id) + '/hqdefault.jpg" onerror="this.classList.add(\'thumb-error\')" alt="">' +
+                    '<span class="thumb-play" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>' +
+                  '</div>' +
+                  '<div class="video-body">' +
+                    '<div class="video-meta">' +
+                      '<span class="channel-badge">' + escapeHtml(v.channel || "") + '</span>' +
+                      pubDateHtml +
+                    '</div>' +
+                    '<h3>' + escapeHtml(v.title || "(제목 없음)") + '</h3>' +
+                    '<p>' + escapeHtml(v.summary || "") + '</p>' +
+                  '</div>' +
+                '</article>';
+            });
+            html += '</section>';
+          });
+          if (!html) {
+            host.innerHTML = '<div class="empty-state"><h3>아직 큐레이션된 영상이 없습니다</h3></div>';
+            return;
+          }
+          host.innerHTML = html;
+
+          // 카드 클릭 → 부모 프레임 해시 이동 → 해당 토픽 페이지 로드
+          host.querySelectorAll(".js-go-topic").forEach(function (card) {
+            var go = function () {
+              var tid = card.getAttribute("data-topic");
+              if (!tid) return;
+              try { window.parent.location.hash = "#/" + tid; }
+              catch (e) { window.top.location.hash = "#/" + tid; }
+            };
+            card.addEventListener("click", go);
+            card.addEventListener("keydown", function (ev) {
+              if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); }
+            });
+          });
+        });
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>
