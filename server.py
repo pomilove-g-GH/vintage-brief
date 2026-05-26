@@ -8,6 +8,21 @@ Vintage Daily Digest — 로컬 개발 서버
 """
 import os, json, subprocess, datetime, re, sys, secrets, functools, shutil
 
+# 자막 + LLM 요약 (옵션 — 의존 모듈 없거나 키 없으면 자동 비활성)
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+    YT_TRANS_OK = True
+except Exception:
+    YT_TRANS_OK = False
+try:
+    import anthropic
+    ANTHROPIC_OK = True
+except Exception:
+    ANTHROPIC_OK = False
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5")
+
 # 한글 우선 + 의미 있는 라인 추출 (해외 채널 대비 fallback 포함)
 _HANGUL_RE = re.compile(r"[가-힣ᄀ-ᇿ㄰-㆏]")
 
@@ -54,6 +69,75 @@ def pick_summary(desc, max_len=200):
             return _accumulate(lines, i, hard_max=max_len)
     # 4순위: 그냥 첫 줄
     return (lines[0] if lines else "")[:max_len]
+
+
+def fetch_transcript(video_id):
+    """YouTube 자막 — 한국어 우선 → 영어 → 그 외. 실패시 None."""
+    if not YT_TRANS_OK or not video_id:
+        return None
+    for langs in (["ko"], ["en"], None):
+        try:
+            if langs:
+                data = YouTubeTranscriptApi.get_transcript(video_id, languages=langs)
+            else:
+                data = YouTubeTranscriptApi.get_transcript(video_id)
+            text = " ".join(d.get("text", "") for d in data)
+            text = re.sub(r"\s+", " ", text).strip()
+            if text:
+                return text
+        except (NoTranscriptFound, TranscriptsDisabled):
+            if langs is None:
+                return None
+            continue
+        except Exception as e:
+            print(f"[transcript] {video_id} error: {e}", flush=True)
+            return None
+    return None
+
+
+def summarize_with_claude(text, title="", target_chars=120):
+    """Claude Haiku 로 핵심 내용 한국어 요약. 실패시 None."""
+    if not ANTHROPIC_OK or not ANTHROPIC_API_KEY or not text:
+        return None
+    text = str(text)[:6000]
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        msg = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=200,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"다음은 유튜브 영상의 자막 또는 설명입니다. "
+                    f"영상 제목: '{title}'\n\n"
+                    f"이 영상의 핵심 내용을 한국어로 약 {target_chars}자 이내, 한 문단으로 요약해주세요. "
+                    f"인사말·구독요청·광고는 제외하고 정보가 되는 부분만. 요약문만 출력하세요.\n\n"
+                    f"---\n{text}\n---"
+                )
+            }]
+        )
+        out = "".join(getattr(b, "text", "") for b in msg.content).strip()
+        out = out.replace("\n", " ")
+        return out[:target_chars * 2] if out else None
+    except Exception as e:
+        print(f"[claude] error: {e}", flush=True)
+        return None
+
+
+def build_smart_summary(video_id, title, fallback_desc):
+    """자막 → Claude 요약 → 실패시 description → Claude → 실패시 pick_summary."""
+    transcript = fetch_transcript(video_id)
+    if transcript:
+        s = summarize_with_claude(transcript, title)
+        if s:
+            return s
+    if fallback_desc:
+        s = summarize_with_claude(fallback_desc, title)
+        if s:
+            return s
+    return pick_summary(fallback_desc or "")
+
+
 from flask import Flask, request, jsonify, send_from_directory, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -519,8 +603,11 @@ def api_update():
             if raw_date and len(raw_date) == 8:
                 v["pubDate"] = f"{raw_date[:4]}년 {int(raw_date[4:6])}월 {int(raw_date[6:8])}일"
             desc = info.get("description") or ""
-            if desc and not v.get("summary"):
-                v["summary"] = pick_summary(desc)
+            if not v.get("summary"):
+                # 자막 + Claude 요약 우선, 실패시 description 기반 휴리스틱
+                smart = build_smart_summary(v["id"], v.get("title", ""), desc)
+                if smart:
+                    v["summary"] = smart
     except Exception:
         pass
 
@@ -539,6 +626,64 @@ def api_update():
         json.dump(merged, f, ensure_ascii=False, indent=2)
 
     return jsonify({"added": len(found), "videos": found})
+
+
+@app.route("/api/admin/resummarize", methods=["POST"])
+@admin_only
+def api_resummarize():
+    """모든 아카이브 영상을 자막+Claude 로 재요약. 시간 소요 큼.
+       body: {topic?: <id> 특정 토픽만, force?: bool 빈 게 아닌 것도 덮어쓰기}"""
+    body = request.get_json(force=True) or {}
+    only_topic = body.get("topic")
+    force = bool(body.get("force"))
+
+    if not (ANTHROPIC_OK and ANTHROPIC_API_KEY):
+        return jsonify({"error": "ANTHROPIC_API_KEY 미설정 또는 anthropic 모듈 없음"}), 503
+
+    results = {"processed": 0, "updated": 0, "failed_files": []}
+    if not os.path.isdir(DATA_DIR):
+        return jsonify(results)
+
+    for fname in sorted(os.listdir(DATA_DIR)):
+        if not fname.endswith(".json"):
+            continue
+        tid = fname[:-5]
+        if only_topic and tid != only_topic:
+            continue
+        fpath = os.path.join(DATA_DIR, fname)
+        try:
+            arr = _read_json(fpath, [])
+            if not isinstance(arr, list):
+                continue
+            changed = False
+            for v in arr:
+                vid = v.get("id")
+                if not vid:
+                    continue
+                cur = v.get("summary", "")
+                if cur and not force:
+                    continue
+                title = v.get("title", "")
+                # 자막만 시도 (description 은 이미 적용된 fallback 일 수 있음)
+                transcript = fetch_transcript(vid)
+                src = transcript or ""
+                if not src and force:
+                    # description 도 시도하려면 별도 fetch 필요 — 생략하고 fallback 유지
+                    continue
+                new_sum = summarize_with_claude(src, title) if src else None
+                if new_sum:
+                    v["summary"] = new_sum
+                    changed = True
+                results["processed"] += 1
+                if new_sum:
+                    results["updated"] += 1
+            if changed:
+                _write_json(fpath, arr)
+        except Exception as e:
+            print(f"[resummarize] {fname} error: {e}", flush=True)
+            results["failed_files"].append(fname)
+
+    return jsonify(results)
 
 
 @app.route("/api/move", methods=["POST"])

@@ -2,3 +2,5 @@ flask>=3.0
 werkzeug>=3.0
 yt-dlp
 gunicorn
+youtube-transcript-api>=0.6
+anthropic>=0.40
