@@ -8,15 +8,33 @@ Vintage Daily Digest — 로컬 개발 서버
 """
 import os, json, subprocess, datetime, re, sys, secrets, functools, shutil
 
-# 한글 우선 첫 줄 추출 (영문 번역 제목 회피)
+# 한글 우선 + 의미 있는 라인 추출 (해외 채널 대비 fallback 포함)
 _HANGUL_RE = re.compile(r"[가-힣ᄀ-ᇿ㄰-㆏]")
+
+def _meaningful(line):
+    """URL/해시태그/멘션/이모지만 있는 줄 제외 — 알파벳·한글 5자 이상이어야 함."""
+    if not line:
+        return False
+    cnt = sum(1 for c in line if c.isalpha() or '가' <= c <= '힣')
+    return cnt >= 5
+
 def pick_summary(desc, max_len=200):
     if not desc:
         return ""
     lines = [l.strip() for l in str(desc).split("\n") if l.strip()]
+    # 1순위: 한글 + 의미
+    for line in lines:
+        if _HANGUL_RE.search(line) and _meaningful(line):
+            return line[:max_len]
+    # 2순위: 한글 포함
     for line in lines:
         if _HANGUL_RE.search(line):
             return line[:max_len]
+    # 3순위: 외국어라도 의미 있는 줄
+    for line in lines:
+        if _meaningful(line):
+            return line[:max_len]
+    # 4순위: 그냥 첫 줄
     return (lines[0] if lines else "")[:max_len]
 from flask import Flask, request, jsonify, send_from_directory, session
 from werkzeug.security import generate_password_hash, check_password_hash

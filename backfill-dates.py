@@ -14,12 +14,25 @@ DATA_DIR  = os.path.join(DATA_ROOT, "data")
 BATCH     = 10   # 한번에 yt-dlp 에 넘길 URL 갯수
 
 _HANGUL_RE = re.compile(r"[가-힣ᄀ-ᇿ㄰-㆏]")
+
+def _meaningful(line):
+    if not line:
+        return False
+    cnt = sum(1 for c in line if c.isalpha() or '가' <= c <= '힣')
+    return cnt >= 5
+
 def pick_summary(desc, max_len=200):
     if not desc:
         return ""
     lines = [l.strip() for l in str(desc).split("\n") if l.strip()]
     for line in lines:
+        if _HANGUL_RE.search(line) and _meaningful(line):
+            return line[:max_len]
+    for line in lines:
         if _HANGUL_RE.search(line):
+            return line[:max_len]
+    for line in lines:
+        if _meaningful(line):
             return line[:max_len]
     return (lines[0] if lines else "")[:max_len]
 
@@ -76,12 +89,13 @@ def main():
         if not isinstance(arr, list):
             continue
 
-        # 날짜 누락/불완전 OR summary 가 비었거나 한글 없음 (영문 번역 제목 의심)
+        # 날짜 누락/불완전 OR summary 비어 있음만 재처리.
+        # 한글 없는 summary 는 외국 채널일 수 있으므로 자동 재처리하지 않음.
         need_ids = []
         for v in arr:
             pd = v.get("pubDate", "")
             sm = v.get("summary", "")
-            if (not pd) or ("일" not in pd) or (not sm) or (not has_hangul(sm)):
+            if (not pd) or ("일" not in pd) or (not sm):
                 need_ids.append(v.get("id"))
         need_ids = [vid for vid in need_ids if vid]
 
