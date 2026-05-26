@@ -12,6 +12,7 @@ BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.environ.get("DATA_ROOT", BASE_DIR)
 DATA_DIR  = os.path.join(DATA_ROOT, "data")
 BATCH     = 10   # 한번에 yt-dlp 에 넘길 URL 갯수
+FORCE_RESUM = os.environ.get("FORCE_RESUMMARY") == "1"
 
 _HANGUL_RE = re.compile(r"[가-힣ᄀ-ᇿ㄰-㆏]")
 
@@ -21,19 +22,35 @@ def _meaningful(line):
     cnt = sum(1 for c in line if c.isalpha() or '가' <= c <= '힣')
     return cnt >= 5
 
+def _accumulate(lines, start_idx, target_len=120, hard_max=200):
+    parts = []
+    total = 0
+    for i in range(start_idx, len(lines)):
+        line = lines[i]
+        if not _meaningful(line):
+            if parts:
+                break
+            continue
+        parts.append(line)
+        total += len(line)
+        if total >= target_len:
+            break
+    out = " ".join(parts)
+    return out[:hard_max]
+
 def pick_summary(desc, max_len=200):
     if not desc:
         return ""
     lines = [l.strip() for l in str(desc).split("\n") if l.strip()]
-    for line in lines:
+    for i, line in enumerate(lines):
         if _HANGUL_RE.search(line) and _meaningful(line):
-            return line[:max_len]
+            return _accumulate(lines, i, hard_max=max_len)
     for line in lines:
         if _HANGUL_RE.search(line):
             return line[:max_len]
-    for line in lines:
+    for i, line in enumerate(lines):
         if _meaningful(line):
-            return line[:max_len]
+            return _accumulate(lines, i, hard_max=max_len)
     return (lines[0] if lines else "")[:max_len]
 
 def has_hangul(s):
@@ -90,12 +107,12 @@ def main():
             continue
 
         # 날짜 누락/불완전 OR summary 비어 있음만 재처리.
-        # 한글 없는 summary 는 외국 채널일 수 있으므로 자동 재처리하지 않음.
+        # FORCE_RESUMMARY=1 이면 모든 영상 재요약.
         need_ids = []
         for v in arr:
             pd = v.get("pubDate", "")
             sm = v.get("summary", "")
-            if (not pd) or ("일" not in pd) or (not sm):
+            if FORCE_RESUM or (not pd) or ("일" not in pd) or (not sm):
                 need_ids.append(v.get("id"))
         need_ids = [vid for vid in need_ids if vid]
 
@@ -119,9 +136,9 @@ def main():
             raw = info.get("upload_date", "")
             if raw and len(raw) == 8:
                 v["pubDate"] = f"{raw[:4]}년 {int(raw[4:6])}월 {int(raw[6:8])}일"
-            # summary 가 없거나 한글이 전혀 없으면(영문 번역 제목 가능성) 재설정
+            # summary 가 비었거나 한글 없음 → 재설정. FORCE_RESUM 이면 항상 재설정.
             cur_sm = v.get("summary", "")
-            if (not cur_sm) or (not has_hangul(cur_sm)):
+            if FORCE_RESUM or (not cur_sm) or (not has_hangul(cur_sm)):
                 desc = info.get("description") or ""
                 if desc:
                     new_sm = pick_summary(desc)

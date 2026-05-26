@@ -18,22 +18,40 @@ def _meaningful(line):
     cnt = sum(1 for c in line if c.isalpha() or '가' <= c <= '힣')
     return cnt >= 5
 
+def _accumulate(lines, start_idx, target_len=120, hard_max=200):
+    """start_idx 부터 의미 있는 라인들을 이어붙여 target_len 도달까지 누적.
+       다음 의미 없는 줄(해시태그/URL/멘션 etc.) 만나면 중단."""
+    parts = []
+    total = 0
+    for i in range(start_idx, len(lines)):
+        line = lines[i]
+        if not _meaningful(line):
+            if parts:
+                break  # 의미 있는 단락 끝
+            continue   # 시작 전 잡음 스킵
+        parts.append(line)
+        total += len(line)
+        if total >= target_len:
+            break
+    out = " ".join(parts)
+    return out[:hard_max]
+
 def pick_summary(desc, max_len=200):
     if not desc:
         return ""
     lines = [l.strip() for l in str(desc).split("\n") if l.strip()]
-    # 1순위: 한글 + 의미
-    for line in lines:
+    # 1순위: 한글 + 의미 있는 첫 줄에서 시작해 단락 누적
+    for i, line in enumerate(lines):
         if _HANGUL_RE.search(line) and _meaningful(line):
-            return line[:max_len]
-    # 2순위: 한글 포함
+            return _accumulate(lines, i, hard_max=max_len)
+    # 2순위: 한글 포함 줄 그대로
     for line in lines:
         if _HANGUL_RE.search(line):
             return line[:max_len]
-    # 3순위: 외국어라도 의미 있는 줄
-    for line in lines:
+    # 3순위: 외국어라도 의미 있는 첫 줄에서 시작해 단락 누적
+    for i, line in enumerate(lines):
         if _meaningful(line):
-            return line[:max_len]
+            return _accumulate(lines, i, hard_max=max_len)
     # 4순위: 그냥 첫 줄
     return (lines[0] if lines else "")[:max_len]
 from flask import Flask, request, jsonify, send_from_directory, session
