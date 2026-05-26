@@ -582,6 +582,34 @@ a.video-thumb { text-decoration: none; }
 .card-like-btn:hover { border-color: #e05; background: rgba(238,0,85,0.08); opacity: 1; }
 .card-trash-btn:hover { color: var(--negative); border-color: var(--negative); background: rgba(217,122,146,0.08); opacity: 1; }
 
+/* 터치 기기 / 모바일 — 항상 표시 + 썸네일 위에서도 잘 보이도록 어두운 반투명 배경 */
+@media (hover: none) {
+  .card-check-btn, .card-like-btn, .card-trash-btn {
+    opacity: 1 !important;
+  }
+}
+@media (max-width: 700px) {
+  .card-check-btn, .card-like-btn, .card-trash-btn {
+    opacity: 1 !important;
+    background: rgba(15, 12, 8, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+    z-index: 2;
+  }
+  .card-check-btn.checked {
+    background: rgba(192, 138, 90, 0.92);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #fff;
+  }
+  .card-like-btn.liked {
+    background: rgba(238, 0, 85, 0.85);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #fff;
+  }
+}
+
 /* 이동 액션바 */
 .move-bar {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
