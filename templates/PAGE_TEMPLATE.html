@@ -1,0 +1,77 @@
+<!-- =================================================================
+  Vintage Daily Digest — 일일 콘텐츠 페이지 템플릿
+  -----------------------------------------------------------------
+  매일 아침 자동화가 주제별로 이 템플릿을 채워 새 페이지를 만듭니다.
+  자세한 채우기 규칙은 저장소 루트의 GENERATE.md 를 따르세요.
+
+  [생성 위치]  pages/<YYYY-MM-DD>/<topic-id>.html
+  [topic-id]   vintage-wholesale | vintage-shops-kr | vintage-history | vintage-global
+  [body class] 도매=topic-brown / 국내샵=topic-olive / 역사=topic-burgundy / 해외=topic-navy
+
+  치환 규칙
+   {{...}}   = 실제 값으로 교체
+   카드는 영상형(.video-card) 만 사용, 항목 수만큼 반복
+   .reveal 의 data-delay 는 0,60,120,... 60씩 늘리면 등장 간격이 생김
+================================================================== -->
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{주제명}} — {{YYYY.MM.DD}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../assets/digest.css">
+</head>
+<body class="{{topic-brown | topic-olive | topic-burgundy | topic-navy}}">
+  <main class="page">
+
+    <!-- ===== 히어로 (영상형) ===== -->
+    <header class="page-hero">
+      <div class="hero-pill">{{빈티지 유튜브 큐레이션}}</div>
+      <h1 class="hero-title"><span class="hero-emoji">{{📦}}</span>{{페이지 제목}}</h1>
+      <p class="hero-sub">{{부제 — 테마/대상}}</p>
+      <div class="hero-datepill">{{2026년 5월 26일 화}}</div>
+    </header>
+
+    <!-- ===== 트렌드 요약 콜아웃 ===== -->
+    <section class="trend-callout reveal">
+      <div class="callout-label">{{✨ 오늘의 한줄 트렌드}}</div>
+      <p>{{1~3문장 요약. 강조할 부분은}} <strong>{{이렇게}}</strong> {{감쌉니다.}}</p>
+    </section>
+
+    <!-- ===== 섹션 ===== -->
+    <section aria-label="{{섹션 설명}}">
+      <h2 class="section-head">🎬 {{이주의 픽}}</h2>
+      <div class="section-rule"></div>
+
+      <!-- ----- 영상 카드 : 영상 3~5개만큼 반복 -----
+           썸네일·제목은 유튜브 영상 URL 로 연결.
+           썸네일 로드 실패 시 onerror 로 숨겨지고 카드 배경 그라디언트가 대체. -->
+      <article class="video-card reveal" data-delay="0">
+        <a class="video-thumb" href="{{영상 URL}}" target="_blank" rel="noopener">
+          <img src="https://img.youtube.com/vi/{{영상ID}}/hqdefault.jpg" onerror="this.classList.add('thumb-error')" alt="">
+          <span class="thumb-rank">#1</span>
+          <span class="thumb-play" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
+        </a>
+        <div class="video-body">
+          <div class="video-meta">
+            <span class="channel-badge">{{채널명}}</span>
+            <span class="video-date">{{2026년 5월 26일}}</span>
+          </div>
+          <h3><a class="video-title-link" href="{{영상 URL}}" target="_blank" rel="noopener">{{영상 제목}}</a></h3>
+          <p>{{영상 요약 — 무엇을 다루고 누구에게 유용한지 2~3문장.}}</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ===== 페이지 푸터 ===== -->
+    <footer class="page-foot">
+      {{검색 키워드 등 부가 정보}}<br>
+      {{수집 방식}} · {{YYYY년 M월 D일}} {{HH:MM}} KST 갱신
+    </footer>
+  </main>
+  <script src="../../assets/page.js"></script>
+</body>
+</html>

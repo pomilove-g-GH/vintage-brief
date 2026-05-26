@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>좋아요 — Vintage Daily Digest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/digest.css">
+  <script src="../manifest.js"></script>
+</head>
+<body class="topic-brown">
+  <main class="page">
+
+    <header class="page-hero">
+      <div class="hero-pill">❤️ 좋아요</div>
+      <h1 class="hero-title"><span class="hero-emoji">❤️</span>좋아요</h1>
+      <p class="hero-sub">좋아요를 누른 영상 모음. 해당 채널은 다음 업데이트 때 우선 검색됩니다.</p>
+    </header>
+
+    <div class="topic-controls" id="topicControls">
+      <div class="topic-counts">좋아요 항목 <strong id="likesCount">0</strong>개</div>
+      <div class="spacer"></div>
+      <button class="card-action-btn" id="clearAllBtn" type="button" style="border-color:var(--negative); color:var(--negative);">전체 좋아요 취소</button>
+    </div>
+
+    <div id="likesList" aria-label="좋아요 항목"></div>
+
+    <footer class="page-foot">
+      좋아요 목록은 서버에 사용자별로 저장됩니다. 로그아웃 후 다시 로그인해도 유지됩니다.
+    </footer>
+  </main>
+
+  <script src="../assets/page.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var manifest = window.DIGEST_MANIFEST || { topics: [] };
+      var urlParams = new URLSearchParams(location.search);
+      var ROLE = urlParams.get("role") || "anonymous";
+
+      function topicById(id) {
+        for (var i = 0; i < manifest.topics.length; i++) if (manifest.topics[i].id === id) return manifest.topics[i];
+        return null;
+      }
+      function notifyParent() {
+        try { window.parent.postMessage({ type: "vintage-likes-changed" }, "*"); } catch (e) {}
+      }
+      function escapeHtml(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+      function fmtTime(ms) {
+        if (!ms) return "";
+        var d = new Date(ms);
+        var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      }
+
+      function loadLikes() {
+        return fetch("/api/likes", { credentials: "same-origin" })
+          .then(function (r) {
+            if (r.status === 401) return null;
+            if (!r.ok) return [];
+            return r.json();
+          })
+          .catch(function () { return []; });
+      }
+
+      function render() {
+        if (ROLE === "anonymous") {
+          document.getElementById("likesCount").textContent = 0;
+          document.getElementById("clearAllBtn").style.display = "none";
+          document.getElementById("likesList").innerHTML =
+            '<div class="empty-state">' +
+              '<h3>로그인이 필요합니다</h3>' +
+              '<p>좋아요 기능을 사용하려면 로그인하세요.</p>' +
+            '</div>';
+          return;
+        }
+        loadLikes().then(function (likes) {
+          if (likes === null) {
+            document.getElementById("likesCount").textContent = 0;
+            document.getElementById("clearAllBtn").style.display = "none";
+            document.getElementById("likesList").innerHTML =
+              '<div class="empty-state"><h3>로그인이 필요합니다</h3></div>';
+            return;
+          }
+          document.getElementById("likesCount").textContent = likes.length;
+          var host = document.getElementById("likesList");
+          if (!likes.length) {
+            host.innerHTML =
+              '<div class="empty-state">' +
+                '<h3>좋아요한 영상이 없습니다</h3>' +
+                '<p>토픽 페이지에서 영상의 ❤️ 버튼을 누르면 여기에 표시됩니다.</p>' +
+              '</div>';
+            document.getElementById("clearAllBtn").style.display = "none";
+            return;
+          }
+          document.getElementById("clearAllBtn").style.display = "";
+
+          // 사이드바 저장 순서 로드
+          var savedOrder = null;
+          try {
+            var raw = localStorage.getItem("vintage-topic-order");
+            var parsed = raw ? JSON.parse(raw) : null;
+            if (Array.isArray(parsed)) savedOrder = parsed;
+          } catch (e) {}
+          var ordered = manifest.topics.slice();
+          if (savedOrder) {
+            ordered.sort(function (a, b) {
+              var ai = savedOrder.indexOf(a.id), bi = savedOrder.indexOf(b.id);
+              if (ai === -1 && bi === -1) return 0;
+              if (ai === -1) return 1;
+              if (bi === -1) return -1;
+              return ai - bi;
+            });
+          }
+          var topicNum = {};
+          ordered.forEach(function (t, i) { topicNum[t.id] = (i + 1 < 10 ? "0" : "") + (i + 1); });
+
+          var groups = {};
+          likes.forEach(function (item) {
+            if (!groups[item.topic]) groups[item.topic] = [];
+            groups[item.topic].push(item);
+          });
+          var orderedTids = ordered.map(function (t) { return t.id; }).filter(function (id) { return groups[id]; });
+          Object.keys(groups).forEach(function (tid) {
+            if (orderedTids.indexOf(tid) === -1) orderedTids.push(tid);
+          });
+
+          var html = "";
+          orderedTids.forEach(function (tid) {
+            var t = topicById(tid);
+            var tLabel = t ? t.label : tid;
+            var tNum = topicNum[tid] || "?";
+            var items = groups[tid];
+            html +=
+              '<section class="trash-topic-section ' + (t ? 'topic-' + t.accent : 'topic-brown') + '">' +
+                '<h2 class="section-head"><span class="section-num">' + tNum + '.</span> ' + escapeHtml(tLabel) +
+                  '<span class="topic-pill">' + items.length + '</span>' +
+                '</h2>' +
+                '<div class="section-rule"></div>';
+            items.forEach(function (item) {
+              var v = item.video || {};
+              html +=
+                '<article class="video-card" data-vid="' + escapeHtml(v.id) + '" data-topic="' + escapeHtml(tid) + '">' +
+                  '<a class="video-thumb" href="' + escapeHtml(v.url || "#") + '" target="_blank" rel="noopener">' +
+                    '<img src="https://img.youtube.com/vi/' + escapeHtml(v.id) + '/hqdefault.jpg" onerror="this.classList.add(\'thumb-error\')" alt="">' +
+                    '<span class="thumb-play" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>' +
+                  '</a>' +
+                  '<div class="video-body">' +
+                    '<div class="video-meta">' +
+                      '<span class="channel-badge">' + escapeHtml(v.channel || "") + '</span>' +
+                      '<span class="trash-timestamp">❤️ ' + fmtTime(item.likedAt) + '</span>' +
+                    '</div>' +
+                    '<h3><a class="video-title-link" href="' + escapeHtml(v.url || "#") + '" target="_blank" rel="noopener">' + escapeHtml(v.title || "(제목 없음)") + '</a></h3>' +
+                    '<p>' + escapeHtml(v.summary || "") + '</p>' +
+                    '<div class="video-actions">' +
+                      '<button class="card-action-btn js-unlike" type="button">🤍 좋아요 취소</button>' +
+                    '</div>' +
+                  '</div>' +
+                '</article>';
+            });
+            html += '</section>';
+          });
+          host.innerHTML = html;
+          host.querySelectorAll(".js-unlike").forEach(function (b) {
+            b.addEventListener("click", function (ev) {
+              var card = ev.currentTarget.closest("[data-vid]");
+              unlikeItem(card.getAttribute("data-topic"), card.getAttribute("data-vid"));
+            });
+          });
+        });
+      }
+
+      function unlikeItem(topicId, vid) {
+        fetch("/api/likes/" + encodeURIComponent(vid) + "?topic=" + encodeURIComponent(topicId), {
+          method: "DELETE", credentials: "same-origin"
+        }).then(function () { notifyParent(); render(); });
+      }
+
+      function clearAll() {
+        if (!confirm("모든 좋아요를 취소합니다. 계속할까요?")) return;
+        fetch("/api/likes/clear", { method: "POST", credentials: "same-origin" })
+          .then(function () { notifyParent(); render(); });
+      }
+      document.getElementById("clearAllBtn").addEventListener("click", clearAll);
+
+      render();
+    })();
+  </script>
+</body>
+</html>

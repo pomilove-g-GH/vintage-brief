@@ -1,0 +1,71 @@
+# Vintage Daily Digest
+
+빈티지 의류 관련 유튜브 영상 큐레이션 사이트. Flask + yt-dlp 기반.
+
+## 기능
+
+- 4개 주제 카테고리(창업 팁 / 사장 인터뷰 / 도매 사입 정보 / 빈티지샵 탐방)
+- 업데이트 버튼 클릭 시 yt-dlp 로 새 영상 5개 자동 큐레이션
+- 좋아요(사용자별) · 휴지통(공유) · 영구삭제 · 카테고리 간 이동
+- 로그인/회원가입 (첫 가입자 자동 admin)
+- 역할 기반 UI: anonymous / user / admin
+
+## 로컬 실행
+
+```bash
+pip install -r requirements.txt
+python server.py
+```
+
+http://localhost:4322 접속.
+
+## 배포 (Render.com)
+
+### 사전 준비
+- Render 계정 (https://render.com)
+- 본 저장소가 GitHub 에 있어야 함
+
+### Blueprint 로 한 번에 배포
+1. Render 대시보드 → New → Blueprint
+2. GitHub 저장소 연결 → `vintage-brief` 선택
+3. `render.yaml` 자동 감지 → Apply
+4. 디스크 1GB(`/var/data`) 가 자동 마운트되고 Starter 플랜으로 배포됨
+
+### 수동 배포
+1. New → Web Service → 본 저장소 선택
+2. 설정:
+   - Runtime: Python 3
+   - Build: `pip install -r requirements.txt`
+   - Start: `gunicorn server:app --workers 2 --threads 2 --timeout 180 --bind 0.0.0.0:$PORT`
+3. Disks 탭 → Add Disk
+   - Name: `vintage-disk`
+   - Mount Path: `/var/data`
+   - Size: 1 GB
+4. Environment 탭 → 추가:
+   - `DATA_ROOT` = `/var/data`
+   - `RENDER` = `true`
+5. Deploy
+
+### 비용
+- Starter 플랜 약 $7/월 + Disk 1GB 약 $0.25/월
+
+### 첫 사용
+1. 배포 완료 후 `https://vintage-brief.onrender.com` (혹은 부여된 URL) 접속
+2. 우상단 "로그인" → "회원가입" 탭 → ID + 비밀번호 입력 → 첫 가입자가 자동으로 admin
+3. 이후 다른 사람이 가입하면 일반 user 권한
+
+## 데이터 구조
+
+영구 디스크(`DATA_ROOT`) 에 저장되는 것들:
+- `data/<topic>.json` — 토픽별 큐레이션된 영상 목록
+- `users.json` — 사용자 계정 (비밀번호는 해시)
+- `likes/<user_id>.json` — 사용자별 좋아요
+- `_state/trash.json` — 휴지통
+- `_state/permdel.json` — 영구 삭제 차단 목록
+- `.flask-secret` — 세션 키
+
+## 스택
+- Backend: Flask + werkzeug (세션) + gunicorn
+- Search: yt-dlp (서브프로세스)
+- Frontend: vanilla JS, no build step
+- Storage: 파일 기반 (영구 디스크)

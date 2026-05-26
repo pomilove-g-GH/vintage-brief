@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: vintage-brief
+    runtime: python
+    plan: starter
+    region: singapore
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn server:app --workers 2 --threads 2 --timeout 180 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DATA_ROOT
+        value: /var/data
+      - key: RENDER
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.12"
+    disk:
+      name: vintage-disk
+      mountPath: /var/data
+      sizeGB: 1
+    autoDeploy: true

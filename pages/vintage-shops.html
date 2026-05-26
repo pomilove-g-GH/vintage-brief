@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유튜버들의 빈티지샵 추천 — Vintage Daily Digest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/digest.css">
+  <script src="../manifest.js"></script>
+</head>
+<body class="topic-navy">
+  <main class="page">
+    <header class="page-hero">
+      <div class="hero-pill" id="heroPill">유튜버들의 빈티지샵 추천 큐레이션</div>
+      <h1 class="hero-title"><span class="hero-emoji" id="heroEmoji">🛍️</span><span id="heroTitle">유튜버들의 빈티지샵 추천</span></h1>
+      <p class="hero-sub" id="heroSub">유명 유튜버들의 빈티지샵 소개·탐방 영상 큐레이션.</p>
+    </header>
+    <div id="topicMeta"></div>
+    <div class="topic-controls" id="topicControls"></div>
+    <section id="videoList" aria-label="아카이브된 영상"></section>
+    <nav id="pager" class="pagination" aria-label="페이지 이동"></nav>
+    <footer class="page-foot">
+      <strong>업데이트 방식:</strong> 토픽별 버튼 클릭 시마다 신규 영상 5개 큐레이션<br>
+      Vintage Daily Digest · localStorage 기반 휴지통
+    </footer>
+  </main>
+  <script>window.TOPIC_ID = "vintage-shops";</script>
+  <script src="../assets/page.js"></script>
+  <script src="../assets/topic-page.js"></script>
+</body>
+</html>

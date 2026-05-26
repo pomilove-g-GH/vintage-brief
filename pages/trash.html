@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko" class="theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>휴지통 — Vintage Daily Digest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/digest.css">
+  <script src="../manifest.js"></script>
+</head>
+<body class="topic-burgundy">
+  <main class="page">
+
+    <header class="page-hero">
+      <div class="hero-pill">🗑️ 휴지통</div>
+      <h1 class="hero-title"><span class="hero-emoji">🗑️</span>휴지통</h1>
+      <p class="hero-sub">관리자가 정리한 영상 모음. 복원하거나 영구 삭제할 수 있습니다.</p>
+    </header>
+
+    <div class="topic-controls" id="topicControls">
+      <div class="topic-counts">휴지통 항목 <strong id="trashCount">0</strong>개</div>
+      <div class="spacer"></div>
+      <button class="card-action-btn" id="emptyAllBtn" type="button" style="border-color:var(--negative); color:var(--negative);">⚠️ 휴지통 전체 비우기</button>
+    </div>
+
+    <div id="trashList" aria-label="휴지통 항목"></div>
+
+    <footer class="page-foot">
+      휴지통은 서버에 저장되며 모든 방문자에게 영향을 줍니다.<br>
+      복원: 원래 토픽 페이지에서 다시 보이게 됩니다. 영구삭제: 향후 큐레이션에서 다시 추천되지 않도록 차단합니다.
+    </footer>
+  </main>
+
+  <script src="../assets/page.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var manifest = window.DIGEST_MANIFEST || { topics: [] };
+      var urlParams = new URLSearchParams(location.search);
+      var ROLE = urlParams.get("role") || "anonymous";
+
+      function topicById(id) {
+        for (var i = 0; i < manifest.topics.length; i++) if (manifest.topics[i].id === id) return manifest.topics[i];
+        return null;
+      }
+      function notifyParent() {
+        try { window.parent.postMessage({ type: "vintage-trash-changed" }, "*"); } catch (e) {}
+      }
+      function escapeHtml(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+      function fmtTime(ms) {
+        if (!ms) return "";
+        var d = new Date(ms);
+        var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+      }
+
+      function loadTrash() {
+        return fetch("/api/trash", { credentials: "same-origin" })
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .catch(function () { return []; });
+      }
+
+      if (ROLE !== "admin") {
+        document.getElementById("trashCount").textContent = 0;
+        document.getElementById("emptyAllBtn").style.display = "none";
+        document.getElementById("trashList").innerHTML =
+          '<div class="empty-state">' +
+            '<h3>관리자만 접근할 수 있습니다</h3>' +
+            '<p>휴지통은 관리자(admin) 권한이 필요합니다.</p>' +
+          '</div>';
+        return;
+      }
+
+      function render() {
+        loadTrash().then(function (trash) {
+          document.getElementById("trashCount").textContent = trash.length;
+          var host = document.getElementById("trashList");
+          if (!trash.length) {
+            host.innerHTML =
+              '<div class="empty-state">' +
+                '<h3>휴지통이 비어 있습니다</h3>' +
+                '<p>토픽 페이지에서 영상을 "휴지통으로 이동" 하면 여기에 표시됩니다.</p>' +
+              '</div>';
+            document.getElementById("emptyAllBtn").style.display = "none";
+            return;
+          }
+          document.getElementById("emptyAllBtn").style.display = "";
+
+          var savedOrder = null;
+          try {
+            var raw = localStorage.getItem("vintage-topic-order");
+            var parsed = raw ? JSON.parse(raw) : null;
+            if (Array.isArray(parsed)) savedOrder = parsed;
+          } catch (e) {}
+          var ordered = manifest.topics.slice();
+          if (savedOrder) {
+            ordered.sort(function (a, b) {
+              var ai = savedOrder.indexOf(a.id), bi = savedOrder.indexOf(b.id);
+              if (ai === -1 && bi === -1) return 0;
+              if (ai === -1) return 1;
+              if (bi === -1) return -1;
+              return ai - bi;
+            });
+          }
+          var topicNum = {};
+          ordered.forEach(function (t, i) { topicNum[t.id] = (i + 1 < 10 ? "0" : "") + (i + 1); });
+
+          var groups = {};
+          trash.forEach(function (item) {
+            if (!groups[item.topic]) groups[item.topic] = [];
+            groups[item.topic].push(item);
+          });
+          var orderedTids = ordered.map(function (t) { return t.id; }).filter(function (id) { return groups[id]; });
+          Object.keys(groups).forEach(function (tid) {
+            if (orderedTids.indexOf(tid) === -1) orderedTids.push(tid);
+          });
+
+          var html = "";
+          orderedTids.forEach(function (tid) {
+            var t = topicById(tid);
+            var tLabel = t ? t.label : tid;
+            var tNum = topicNum[tid] || "?";
+            var items = groups[tid];
+            html +=
+              '<section class="trash-topic-section ' + (t ? 'topic-' + t.accent : 'topic-brown') + '">' +
+                '<h2 class="section-head"><span class="section-num">' + tNum + '.</span> ' + escapeHtml(tLabel) +
+                  '<span class="topic-pill">' + items.length + '</span>' +
+                '</h2>' +
+                '<div class="section-rule"></div>';
+            items.forEach(function (item) {
+              var v = item.video || {};
+              html +=
+                '<article class="video-card" data-vid="' + escapeHtml(v.id) + '" data-topic="' + escapeHtml(tid) + '">' +
+                  '<a class="video-thumb" href="' + escapeHtml(v.url || "#") + '" target="_blank" rel="noopener">' +
+                    '<img src="https://img.youtube.com/vi/' + escapeHtml(v.id) + '/hqdefault.jpg" onerror="this.classList.add(\'thumb-error\')" alt="">' +
+                    '<span class="thumb-play" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>' +
+                  '</a>' +
+                  '<div class="video-body">' +
+                    '<div class="video-meta">' +
+                      '<span class="channel-badge">' + escapeHtml(v.channel || "") + '</span>' +
+                      '<span class="trash-timestamp">삭제 ' + fmtTime(item.trashedAt) + '</span>' +
+                    '</div>' +
+                    '<h3><a class="video-title-link" href="' + escapeHtml(v.url || "#") + '" target="_blank" rel="noopener">' + escapeHtml(v.title || "(제목 없음)") + '</a></h3>' +
+                    '<p>' + escapeHtml(v.summary || "") + '</p>' +
+                    '<div class="video-actions">' +
+                      '<button class="card-action-btn restore js-restore" type="button">↩️ 복원</button>' +
+                      '<button class="card-action-btn js-permdel" type="button">❌ 영구 삭제</button>' +
+                    '</div>' +
+                  '</div>' +
+                '</article>';
+            });
+            html += '</section>';
+          });
+          host.innerHTML = html;
+
+          host.querySelectorAll(".js-restore").forEach(function (b) {
+            b.addEventListener("click", function (ev) {
+              var card = ev.currentTarget.closest("[data-vid]");
+              restoreItem(card.getAttribute("data-topic"), card.getAttribute("data-vid"));
+            });
+          });
+          host.querySelectorAll(".js-permdel").forEach(function (b) {
+            b.addEventListener("click", function (ev) {
+              var card = ev.currentTarget.closest("[data-vid]");
+              permdelItem(card.getAttribute("data-topic"), card.getAttribute("data-vid"));
+            });
+          });
+        });
+      }
+
+      function restoreItem(topicId, vid) {
+        if (!confirm("이 영상을 원래 토픽으로 복원합니다.\n\n계속할까요?")) return;
+        fetch("/api/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ videoId: vid, topic: topicId })
+        }).then(function (r) {
+          if (r.ok) { toast("복원되었습니다.", "success"); notifyParent(); render(); }
+          else toast("복원 실패", "error");
+        });
+      }
+
+      function permdelItem(topicId, vid) {
+        if (!confirm("⚠️ 이 영상을 영구 삭제합니다.\n\n• 휴지통에서 사라집니다.\n• 앞으로 자동 큐레이션에서도 다시 추천되지 않습니다.\n\n계속할까요?")) return;
+        fetch("/api/permdel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ videoId: vid, topic: topicId })
+        }).then(function (r) {
+          if (r.ok) { toast("영구 삭제되었습니다.", "error"); notifyParent(); render(); }
+          else toast("실패", "error");
+        });
+      }
+
+      function emptyAll() {
+        if (!confirm("⚠️ 휴지통의 모든 항목을 비웁니다.\n\n• 영구 삭제와 달리 향후 큐레이션에서 다시 추천될 수 있습니다.\n\n계속할까요?")) return;
+        fetch("/api/trash/empty", { method: "POST", credentials: "same-origin" })
+          .then(function (r) {
+            if (r.ok) { toast("휴지통을 비웠습니다.", "success"); notifyParent(); render(); }
+            else toast("실패", "error");
+          });
+      }
+      document.getElementById("emptyAllBtn").addEventListener("click", emptyAll);
+
+      function toast(msg, kind) {
+        var host = document.getElementById("toastHost");
+        if (!host) { host = document.createElement("div"); host.id = "toastHost"; host.className = "toast-host"; document.body.appendChild(host); }
+        var el = document.createElement("div");
+        el.className = "toast " + (kind || "success");
+        el.textContent = msg;
+        host.appendChild(el);
+        setTimeout(function () { el.style.opacity = "0"; el.style.transition = "opacity 0.3s"; }, 2400);
+        setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 2800);
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>

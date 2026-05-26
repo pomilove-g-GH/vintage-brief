@@ -1,0 +1,24 @@
+.DS_Store
+Thumbs.db
+node_modules/
+.env
+.env.local
+*.log
+.claude/
+.agents/
+skills-lock.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Flask 비밀 키
+.flask-secret
+
+# 로컬 사용자/세션 데이터 (운영시 디스크 저장)
+users.json
+likes/
+_state/
