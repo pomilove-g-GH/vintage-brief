@@ -19,7 +19,51 @@ python server.py
 
 http://localhost:4322 접속.
 
-## 배포 (Render.com)
+## 배포 (Fly.io — 권장)
+
+### 사전 준비
+1. Fly.io 계정 (https://fly.io) — 신용카드 등록 필요 (사용량 없으면 청구 0)
+2. flyctl CLI 설치:
+   - Windows PowerShell: `iwr https://fly.io/install.ps1 -useb | iex`
+   - 또는 https://fly.io/docs/flyctl/install/
+
+### 배포 절차
+```powershell
+# 1. 로그인
+fly auth login
+
+# 2. 앱 생성 (대화형 — 기본값 그대로 Y, 단 fly.toml 덮어쓰기는 N 으로!)
+fly launch --no-deploy
+#   - "Would you like to copy its configuration to the new app?" → Y
+#   - app 이름 → vintage-brief (이미 있으면 다른 이름)
+#   - region → nrt (Tokyo)
+#   - postgres / redis → N
+#   - deploy now? → N
+
+# 3. 영구 볼륨 생성 (1GB, 무료 한도 내)
+fly volumes create vintage_data --size 1 --region nrt
+
+# 4. 배포
+fly deploy
+
+# 5. URL 확인
+fly status
+```
+
+배포 완료 후 `https://vintage-brief.fly.dev` (이름 다르면 그에 맞춰) 접속.
+
+### 비용
+Fly.io 무료 한도:
+- shared-cpu-1x VM 3개
+- 영구 볼륨 3GB
+- 아웃바운드 트래픽 160GB/월
+- 대시 보드 https://fly.io/dashboard 에서 사용량 확인
+
+본 앱은 VM 1개 + 1GB 볼륨이라 무료 한도 내. 트래픽 적으면 청구 0원.
+
+`auto_stop_machines = "stop"` 설정으로 유휴 시 자동 정지 → 첫 접속 시 ~5초 콜드 스타트.
+
+## 배포 (Render.com — 대안)
 
 ### 사전 준비
 - Render 계정 (https://render.com)

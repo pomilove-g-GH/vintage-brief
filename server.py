@@ -44,7 +44,9 @@ app = Flask(__name__)
 app.secret_key = _secret
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # 프로덕션(HTTPS) 에서는 secure cookie
-if os.environ.get("FLASK_ENV") == "production" or os.environ.get("RENDER") == "true":
+if (os.environ.get("FLASK_ENV") == "production"
+        or os.environ.get("RENDER") == "true"
+        or os.environ.get("FLY_APP_NAME")):
     app.config["SESSION_COOKIE_SECURE"] = True
 
 
