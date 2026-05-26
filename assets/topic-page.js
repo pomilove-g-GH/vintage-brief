@@ -342,6 +342,7 @@
       var num = (i + 1 < 10 ? "0" : "") + (i + 1);
       return '<option value="' + t.id + '">' + num + '. ' + t.label + '</option>';
     }).join("");
+    optionsHtml += '<option value="__trash__">🗑️ 휴지통으로 이동</option>';
 
     if (!existing) {
       existing = document.createElement("div");
@@ -363,35 +364,55 @@
   }
 
   function onMoveClick() {
-    var toTopic = document.getElementById("moveTarget").value;
-    if (!toTopic) return;
+    var target = document.getElementById("moveTarget").value;
+    if (!target) return;
     var videoIds = Object.keys(state.selected);
     if (!videoIds.length) return;
 
+    var finish = function (msg, kind) {
+      state.selected = {};
+      var bar = document.getElementById("moveBar");
+      if (bar) bar.parentNode.removeChild(bar);
+      toast(msg, kind);
+      try { window.parent.postMessage({ type: "vintage-trash-changed" }, "*"); } catch (e) {}
+      loadArchive().then(function (newData) {
+        state.archive = Array.isArray(newData) ? newData : [];
+        state.page = 1;
+        renderList();
+      });
+    };
+
+    // 일괄 휴지통 이동 — 각 영상별 POST /api/trash 병렬 호출
+    if (target === "__trash__") {
+      Promise.all(videoIds.map(function (vid) {
+        return fetch("/api/trash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ topic: topicId, videoId: vid })
+        }).then(function (r) { return r.ok; });
+      })).then(function (results) {
+        var ok = results.filter(function (x) { return x; }).length;
+        finish(ok + "개 영상을 휴지통으로 이동했습니다.", "success");
+      }).catch(function () {
+        toast("휴지통 이동 실패.", "error");
+      });
+      return;
+    }
+
+    // 다른 토픽으로 이동
     fetch("/api/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
-      body: JSON.stringify({ fromTopic: topicId, toTopic: toTopic, videoIds: videoIds })
+      body: JSON.stringify({ fromTopic: topicId, toTopic: target, videoIds: videoIds })
     })
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (data) {
-      state.selected = {};
-      var bar = document.getElementById("moveBar");
-      if (bar) bar.parentNode.removeChild(bar);
-      toast(data.moved + "개 영상을 이동했습니다.", "success");
-      loadArchive().then(function (newData) {
-        state.archive = Array.isArray(newData) ? newData : [];
-        state.archive.sort(function (a, b) {
-          if (a.addedAt && b.addedAt) return b.addedAt.localeCompare(a.addedAt);
-          return 0;
-        });
-        state.page = 1;
-        renderList();
-      });
+      finish(data.moved + "개 영상을 이동했습니다.", "success");
     })
     .catch(function () {
-      toast("이동 실패 — server.py 실행 여부를 확인하세요.", "error");
+      toast("이동 실패 — 서버 응답 확인.", "error");
     });
   }
 
