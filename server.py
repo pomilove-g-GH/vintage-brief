@@ -422,6 +422,36 @@ def api_trash_move():
     write_trash(trash)
     return jsonify({"ok": True})
 
+@app.route("/api/trash/batch", methods=["POST"])
+@admin_only
+def api_trash_move_batch():
+    """일괄 휴지통 이동 — race condition 회피용 단일 트랜잭션."""
+    body = request.get_json(force=True)
+    topic_id = body.get("topic")
+    vids = body.get("videoIds", [])
+    if not topic_id or not isinstance(vids, list) or not vids:
+        return jsonify({"error": "topic + videoIds 필수"}), 400
+    vid_set = set(vids)
+    data_path = os.path.join(DATA_DIR, f"{topic_id}.json")
+    arr = _read_json(data_path, [])
+    moved = [v for v in arr if v.get("id") in vid_set]
+    rest  = [v for v in arr if v.get("id") not in vid_set]
+    if not moved:
+        return jsonify({"error": "원본 토픽에서 영상을 찾을 수 없습니다.", "moved": 0}), 404
+    _write_json(data_path, rest)
+    trash = read_trash()
+    now_ms = int(datetime.datetime.now().timestamp() * 1000)
+    for v in moved:
+        trash.insert(0, {
+            "topic":     topic_id,
+            "videoId":   v.get("id"),
+            "trashedAt": now_ms,
+            "video":     v,
+        })
+    write_trash(trash)
+    return jsonify({"ok": True, "moved": len(moved)})
+
+
 @app.route("/api/restore", methods=["POST"])
 @admin_only
 def api_restore():

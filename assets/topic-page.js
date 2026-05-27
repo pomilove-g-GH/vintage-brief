@@ -391,19 +391,19 @@
       });
     };
 
-    // 일괄 휴지통 이동 — 각 영상별 POST /api/trash 병렬 호출
+    // 일괄 휴지통 이동 — 단일 batch 요청 (race condition 회피)
     if (target === "__trash__") {
-      Promise.all(videoIds.map(function (vid) {
-        return fetch("/api/trash", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ topic: topicId, videoId: vid })
-        }).then(function (r) { return r.ok; });
-      })).then(function (results) {
-        var ok = results.filter(function (x) { return x; }).length;
-        finish(ok + "개 영상을 휴지통으로 이동했습니다.", "success");
-      }).catch(function () {
+      fetch("/api/trash/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ topic: topicId, videoIds: videoIds })
+      })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (data) {
+        finish((data.moved || 0) + "개 영상을 휴지통으로 이동했습니다.", "success");
+      })
+      .catch(function () {
         toast("휴지통 이동 실패.", "error");
       });
       return;
