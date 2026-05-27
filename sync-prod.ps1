@@ -100,11 +100,11 @@ $env:PYTHONIOENCODING = "utf-8"
 python backfill-dates.py 2>&1 | ForEach-Object { Write-Host "  $_" }
 
 # ------------------------------------------------
-# 6. resummarize-local.py (summary)
+# 6. resummarize-local.py (summary) — --force 로 heuristic 덮어쓰기
 # ------------------------------------------------
 Write-Host ""
-Write-Host "[4/5] Claude로 요약 생성..." -ForegroundColor Cyan
-python resummarize-local.py 2>&1 | ForEach-Object { Write-Host "  $_" }
+Write-Host "[4/5] Claude로 요약 생성 (--force)..." -ForegroundColor Cyan
+python resummarize-local.py --force 2>&1 | ForEach-Object { Write-Host "  $_" }
 
 # ------------------------------------------------
 # 7. SFTP put (delete + upload)
