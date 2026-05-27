@@ -542,6 +542,7 @@ def api_update():
                 "--dump-json",
                 "--no-warnings",
                 "--ignore-errors",
+                "--extractor-args", "youtube:lang=ko",
             ]
             result = subprocess.run(
                 cmd, capture_output=True, text=True, encoding="utf-8", timeout=40
@@ -592,6 +593,7 @@ def api_update():
             *urls,
             "--dump-json", "--skip-download",
             "--no-warnings", "--ignore-errors",
+            "--extractor-args", "youtube:lang=ko",
         ]
         enrich_result = subprocess.run(
             enrich_cmd, capture_output=True, text=True, encoding="utf-8", timeout=120
@@ -692,6 +694,7 @@ def api_resummarize():
                             f"https://www.youtube.com/watch?v={vid}",
                             "--dump-json", "--skip-download",
                             "--no-warnings", "--ignore-errors",
+                            "--extractor-args", "youtube:lang=ko",
                         ]
                         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=30)
                         for line in r.stdout.splitlines():

@@ -66,6 +66,7 @@ def fetch_meta(video_ids):
         *urls,
         "--dump-json", "--skip-download",
         "--no-warnings", "--ignore-errors",
+        "--extractor-args", "youtube:lang=ko",
     ]
     print(f"  yt-dlp 조회 중… ({len(video_ids)}개)")
     try:
