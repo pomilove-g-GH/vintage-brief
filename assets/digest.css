@@ -577,10 +577,24 @@ a.video-thumb { text-decoration: none; }
 .video-card:hover .card-trash-btn { opacity: 1; }
 .card-check-btn.checked { opacity: 1; border-color: var(--topic); background: var(--topic-soft); color: var(--topic-bright); }
 .video-card.selected-card { border-color: var(--topic-line); background: var(--surface-hover); }
-.card-check-btn:hover { border-color: var(--topic); opacity: 1; }
+.card-check-btn:hover {
+  border-color: var(--topic);
+  background: var(--topic-soft);
+  color: var(--topic-bright);
+  opacity: 1;
+}
 .card-like-btn.liked { opacity: 1; border-color: #e05; color: #e05; }
-.card-like-btn:hover { border-color: #e05; background: rgba(238,0,85,0.08); opacity: 1; }
-.card-trash-btn:hover { color: var(--negative); border-color: var(--negative); background: rgba(217,122,146,0.08); opacity: 1; }
+.card-like-btn:hover {
+  border-color: #e05;
+  background: rgba(238,0,85,0.18);
+  opacity: 1;
+}
+.card-trash-btn:hover {
+  color: var(--negative);
+  border-color: var(--negative);
+  background: rgba(217,122,146,0.20);
+  opacity: 1;
+}
 
 /* 터치 기기 / 모바일 — 항상 표시 + 썸네일 위에서도 잘 보이도록 어두운 반투명 배경 */
 @media (hover: none) {
