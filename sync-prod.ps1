@@ -107,20 +107,55 @@ Write-Host "[4/5] Claude로 요약 생성 (--force)..." -ForegroundColor Cyan
 python resummarize-local.py --force 2>&1 | ForEach-Object { Write-Host "  $_" }
 
 # ------------------------------------------------
-# 7. SFTP put (delete + upload)
+# 7. VM 다시 깨우기 (Claude 요약 도중 idle stop 됐을 수 있음)
 # ------------------------------------------------
 Write-Host ""
-Write-Host "[5/5] 프로덕션에 업로드..." -ForegroundColor Cyan
+Write-Host "[5/5] Fly VM 다시 깨우는 중 (Claude 작업 중 idle stop 가능성)..." -ForegroundColor Cyan
+$awake = $false
+for ($i = 0; $i -lt 10; $i++) {
+    try {
+        $resp = Invoke-WebRequest -Uri "https://vintage-brief.fly.dev/api/me" -UseBasicParsing -TimeoutSec 30
+        if ($resp.StatusCode -eq 200) { $awake = $true; break }
+    } catch {}
+    Start-Sleep -Seconds 3
+}
+if (-not $awake) {
+    Write-Host "  ⚠️  VM 깨우기 실패 — 업로드 시도는 계속 진행" -ForegroundColor Yellow
+} else {
+    Write-Host "  ✓ VM 응답 OK" -ForegroundColor Green
+}
+# SSH 안정화를 위해 2초 더
+Start-Sleep -Seconds 2
+
+# ------------------------------------------------
+# 8. SFTP put (재시도 포함)
+# ------------------------------------------------
+Write-Host ""
+Write-Host "  프로덕션 업로드..." -ForegroundColor Cyan
 $env:MSYS_NO_PATHCONV = "1"
 Push-Location $tmpData
 foreach ($f in $files) {
-    fly ssh console -a vintage-brief -C "rm -f /data/data/$f" 2>&1 | Out-Null
-    $out = fly ssh sftp put $f "/data/data/$f" -a vintage-brief 2>&1 | Out-String
-    if ($out -match "uploaded") {
-        Write-Host "  ✓ $f" -ForegroundColor Green
-    } else {
-        Write-Host "  ❌ $f 업로드 실패" -ForegroundColor Red
-        Write-Host $out -ForegroundColor DarkGray
+    $success = $false
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        fly ssh console -a vintage-brief -C "rm -f /data/data/$f" 2>&1 | Out-Null
+        $out = fly ssh sftp put $f "/data/data/$f" -a vintage-brief 2>&1 | Out-String
+        if ($out -match "uploaded") {
+            Write-Host "  ✓ $f" -ForegroundColor Green
+            $success = $true
+            break
+        }
+        if ($out -match "no started VMs") {
+            Write-Host "  ⏳ $f — VM 다시 깨우는 중 (시도 $attempt/3)" -ForegroundColor Yellow
+            try { Invoke-WebRequest -Uri "https://vintage-brief.fly.dev/api/me" -UseBasicParsing -TimeoutSec 30 | Out-Null } catch {}
+            Start-Sleep -Seconds 5
+        } else {
+            Write-Host "  ❌ $f 업로드 실패 (시도 $attempt/3)" -ForegroundColor Red
+            Write-Host $out -ForegroundColor DarkGray
+            Start-Sleep -Seconds 2
+        }
+    }
+    if (-not $success) {
+        Write-Host "  ❌ $f 최종 실패" -ForegroundColor Red
     }
 }
 Pop-Location
