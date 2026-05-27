@@ -114,7 +114,9 @@ def process_video(client, v):
     vid = v.get("id")
     title = v.get("title", "")
     cur = v.get("summary", "")
-    if cur and not FORCE:
+    src_meta = v.get("summaryBy", "")
+    # Claude 요약은 이미 있는 영상만 skip. heuristic/빈 값은 재처리.
+    if cur and src_meta == "claude" and not FORCE:
         return False, "skipped"
     if not vid:
         return False, "no-id"
@@ -133,6 +135,8 @@ def process_video(client, v):
         return False, "no-summary"
 
     v["summary"] = new_sum
+    v["summaryBy"] = "claude"
+    v["summarySource"] = src_kind  # transcript or description
     return True, src_kind
 
 
@@ -159,7 +163,9 @@ def main():
         changed = False
         for v in arr:
             cur = v.get("summary", "")
-            if cur and not FORCE:
+            src_meta = v.get("summaryBy", "")
+            # Claude 요약은 skip. heuristic/빈 값은 재처리 대상.
+            if cur and src_meta == "claude" and not FORCE:
                 continue
             total_processed += 1
             ok, kind = process_video(client, v)

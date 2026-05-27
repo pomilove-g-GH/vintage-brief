@@ -134,17 +134,18 @@ def summarize_with_claude(text, title="", target_chars=120):
 
 
 def build_smart_summary(video_id, title, fallback_desc):
-    """자막 → Claude 요약 → 실패시 description → Claude → 실패시 pick_summary."""
+    """자막 → Claude 요약 → 실패시 description → Claude → 실패시 pick_summary.
+    반환: (summary_text, source_kind) — source_kind in {claude_transcript, claude_description, heuristic, ''}"""
     transcript = fetch_transcript(video_id)
     if transcript:
         s = summarize_with_claude(transcript, title)
         if s:
-            return s
+            return s, "claude_transcript"
     if fallback_desc:
         s = summarize_with_claude(fallback_desc, title)
         if s:
-            return s
-    return pick_summary(fallback_desc or "")
+            return s, "claude_description"
+    return pick_summary(fallback_desc or ""), ("heuristic" if fallback_desc else "")
 
 
 from flask import Flask, request, jsonify, send_from_directory, session
@@ -614,9 +615,11 @@ def api_update():
             desc = info.get("description") or ""
             if not v.get("summary"):
                 # 자막 + Claude 요약 우선, 실패시 description 기반 휴리스틱
-                smart = build_smart_summary(v["id"], v.get("title", ""), desc)
+                smart, src_kind = build_smart_summary(v["id"], v.get("title", ""), desc)
                 if smart:
                     v["summary"] = smart
+                    v["summaryBy"] = "claude" if src_kind.startswith("claude") else "heuristic"
+                    v["summarySource"] = src_kind
     except Exception:
         pass
 
@@ -706,6 +709,7 @@ def api_resummarize():
                         print(f"[resum] {vid} ytdlp error: {e}", flush=True)
                 if new_sum:
                     v["summary"] = new_sum
+                    v["summaryBy"] = "claude"
                     changed = True
                     results["updated"] += 1
                 else:
