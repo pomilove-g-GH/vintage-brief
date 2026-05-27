@@ -91,20 +91,20 @@ if (-not $allOk) {
 }
 
 # ------------------------------------------------
-# 5. backfill-dates.py (pubDate)
+# 5. resummarize-local.py 먼저 — 빈 summary 만 Claude 처리
 # ------------------------------------------------
 Write-Host ""
-Write-Host "[3/5] pubDate 백필..." -ForegroundColor Cyan
+Write-Host "[3/5] Claude로 빈 카드 요약 생성 (이미 요약 있는 건 건너뜀)..." -ForegroundColor Cyan
 $env:DATA_ROOT = $tmpDir
 $env:PYTHONIOENCODING = "utf-8"
-python backfill-dates.py 2>&1 | ForEach-Object { Write-Host "  $_" }
+python resummarize-local.py 2>&1 | ForEach-Object { Write-Host "  $_" }
 
 # ------------------------------------------------
-# 6. resummarize-local.py (summary) — --force 로 heuristic 덮어쓰기
+# 6. backfill-dates.py — pubDate 만 채움 (summary 는 위에서 처리됨)
 # ------------------------------------------------
 Write-Host ""
-Write-Host "[4/5] Claude로 요약 생성 (--force)..." -ForegroundColor Cyan
-python resummarize-local.py --force 2>&1 | ForEach-Object { Write-Host "  $_" }
+Write-Host "[4/5] pubDate 백필..." -ForegroundColor Cyan
+python backfill-dates.py 2>&1 | ForEach-Object { Write-Host "  $_" }
 
 # ------------------------------------------------
 # 7. VM 다시 깨우기 (Claude 요약 도중 idle stop 됐을 수 있음)

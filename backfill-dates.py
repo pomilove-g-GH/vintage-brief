@@ -136,9 +136,10 @@ def main():
             raw = info.get("upload_date", "")
             if raw and len(raw) == 8:
                 v["pubDate"] = f"{raw[:4]}년 {int(raw[4:6])}월 {int(raw[6:8])}일"
-            # summary 가 비었거나 한글 없음 → 재설정. FORCE_RESUM 이면 항상 재설정.
+            # summary 는 resummarize-local.py 에서 Claude 로 처리. 여기서는 손대지 않음.
+            # 단 비어 있고 FORCE_RESUM 인 경우만 heuristic fallback.
             cur_sm = v.get("summary", "")
-            if FORCE_RESUM or (not cur_sm) or (not has_hangul(cur_sm)):
+            if FORCE_RESUM and not cur_sm:
                 desc = info.get("description") or ""
                 if desc:
                     new_sm = pick_summary(desc)
