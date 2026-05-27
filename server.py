@@ -644,14 +644,8 @@ def api_update():
             raw_date = info.get("upload_date", "")
             if raw_date and len(raw_date) == 8:
                 v["pubDate"] = f"{raw_date[:4]}년 {int(raw_date[4:6])}월 {int(raw_date[6:8])}일"
-            desc = info.get("description") or ""
-            if not v.get("summary"):
-                # 자막 + Claude 요약 우선, 실패시 description 기반 휴리스틱
-                smart, src_kind = build_smart_summary(v["id"], v.get("title", ""), desc)
-                if smart:
-                    v["summary"] = smart
-                    v["summaryBy"] = "claude" if src_kind.startswith("claude") else "heuristic"
-                    v["summarySource"] = src_kind
+            # summary 는 의도적으로 비워둠 — 로컬 resummarize-local.py 에서 Claude 로만 채움.
+            # heuristic (description verbatim) summary 는 더 이상 만들지 않는다.
     except Exception:
         pass
 
