@@ -71,16 +71,25 @@ def pick_summary(desc, max_len=200):
     return (lines[0] if lines else "")[:max_len]
 
 
+def _fetch_one(video_id, langs):
+    """youtube-transcript-api 호출 (구/신 API 자동 감지)."""
+    # 신 API (1.x): YouTubeTranscriptApi().fetch(...)
+    if hasattr(YouTubeTranscriptApi, "fetch") and not hasattr(YouTubeTranscriptApi, "get_transcript"):
+        ytt = YouTubeTranscriptApi()
+        fetched = ytt.fetch(video_id, languages=langs) if langs else ytt.fetch(video_id)
+        return [{"text": getattr(s, "text", "")} for s in fetched]
+    # 구 API (0.x): classmethod get_transcript
+    if langs:
+        return YouTubeTranscriptApi.get_transcript(video_id, languages=langs)
+    return YouTubeTranscriptApi.get_transcript(video_id)
+
 def fetch_transcript(video_id):
     """YouTube 자막 — 한국어 우선 → 영어 → 그 외. 실패시 None."""
     if not YT_TRANS_OK or not video_id:
         return None
     for langs in (["ko"], ["en"], None):
         try:
-            if langs:
-                data = YouTubeTranscriptApi.get_transcript(video_id, languages=langs)
-            else:
-                data = YouTubeTranscriptApi.get_transcript(video_id)
+            data = _fetch_one(video_id, langs)
             text = " ".join(d.get("text", "") for d in data)
             text = re.sub(r"\s+", " ", text).strip()
             if text:
