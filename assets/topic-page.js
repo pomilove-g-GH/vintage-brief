@@ -286,6 +286,15 @@
         if (!card) return;
         toggleLike(card.getAttribute("data-vid"), ev.currentTarget);
       });
+      // hover 시 이모지 🤍 → ❤️ 로 교체 (단 .liked 상태가 아닐 때만)
+      likeBtns[lb].addEventListener("mouseenter", function (ev) {
+        var b = ev.currentTarget;
+        if (!b.classList.contains("liked")) b.textContent = "❤️";
+      });
+      likeBtns[lb].addEventListener("mouseleave", function (ev) {
+        var b = ev.currentTarget;
+        if (!b.classList.contains("liked")) b.textContent = "🤍";
+      });
     }
 
     // 카드 체크 버튼 바인딩
