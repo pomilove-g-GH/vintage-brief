@@ -519,11 +519,12 @@
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify({
-        topicId:       topicId,
-        keywords:      topic.keywords  || [],
-        channels:      topic.channels  || [],
-        excludeIds:    excludeIds,
-        likedChannels: likedChannels
+        topicId:        topicId,
+        keywords:       topic.keywords        || [],
+        anchorKeywords: topic.anchorKeywords  || [],
+        channels:       topic.channels        || [],
+        excludeIds:     excludeIds,
+        likedChannels:  likedChannels
       })
     })
     .then(function (r) {

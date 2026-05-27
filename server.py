@@ -512,6 +512,7 @@ def api_update():
     body = request.get_json(force=True)
     topic_id   = body.get("topicId", "")
     keywords   = body.get("keywords", [])
+    anchors    = body.get("anchorKeywords", [])
     channels   = body.get("channels", [])
     exclude    = set(body.get("excludeIds", []))
 
@@ -546,17 +547,37 @@ def api_update():
     # 검색 쿼리 조합 (키워드 앞 3개 + 채널명 1개 순차 시도)
     liked_channels = body.get("likedChannels", [])
 
+    # 앵커 = manifest.anchorKeywords (없으면 keywords[0] 1개).
+    # 모든 쿼리 앞에 앵커가 prepend 되어 토픽 관련성 보장.
+    anchor_list = anchors if anchors else (keywords[:1] if keywords else [])
+    anchor_str  = " ".join(anchor_list)
+
+    def with_anchor(extra):
+        """앵커 + 추가 키워드. 중복 단어는 제거."""
+        seen_w = set()
+        parts = []
+        for w in anchor_list + [x for x in extra.split() if x]:
+            if w and w not in seen_w:
+                seen_w.add(w)
+                parts.append(w)
+        return " ".join(parts)
+
     queries = []
     # 좋아요 채널 우선 검색
     for ch in liked_channels[:3]:
-        queries.append(ch + " " + (keywords[0] if keywords else "빈티지"))
-    # 일반 키워드 검색
-    if keywords:
-        queries.append(" ".join(keywords[:3]))
-    if len(keywords) > 3:
-        queries.append(" ".join(keywords[3:6]))
+        queries.append(with_anchor(ch))
+    # 일반 키워드 검색 — 앵커 + 보조 키워드 묶음
+    extra_kw = [k for k in keywords if k not in set(anchor_list)]
+    if extra_kw:
+        queries.append(with_anchor(" ".join(extra_kw[:3])))
+    if len(extra_kw) > 3:
+        queries.append(with_anchor(" ".join(extra_kw[3:6])))
+    # 앵커만으로도 한 번 — 가장 토픽 정직한 쿼리
+    if anchor_str:
+        queries.append(anchor_str)
+    # 채널 + 앵커
     for ch in channels[:2]:
-        queries.append(ch + " " + (keywords[0] if keywords else ""))
+        queries.append(with_anchor(ch))
 
     found = []
     seen  = set(exclude)
