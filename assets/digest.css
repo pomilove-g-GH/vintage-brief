@@ -152,6 +152,13 @@ body::-webkit-scrollbar-track { background: transparent; }
   max-width: 760px;
 }
 .hero-emoji { font-size: 0.95em; margin-right: 6px; }
+.recent-subheading {
+  margin: 32px 0 16px;
+  font-size: clamp(1.1rem, 2.2vw, 1.35rem);
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+}
 .hero-emoji.hero-num {
   display: inline-block;
   font-family: 'Inter', monospace;

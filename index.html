@@ -409,8 +409,8 @@
         <a class="sb-trash-link" id="sbHome" href="#recent" style="margin-bottom: 14px;">
           <span class="ti-icon">🆕</span>
           <span class="ti-main">
-            <span class="ti-label">신규 큐레이션</span>
-            <span class="ti-sub">홈</span>
+            <span class="ti-label">홈</span>
+            <span class="ti-sub">최근 영상</span>
           </span>
           <span class="ti-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg></span>
         </a>
@@ -781,7 +781,7 @@
       var loader = document.getElementById('loader');
       var vw = document.getElementById('viewer');
       loader.classList.remove('hidden');
-      loader.querySelector('span').textContent = '신규 큐레이션 불러오는 중…';
+      loader.querySelector('span').textContent = '홈 불러오는 중…';
       var cu = window.CURRENT_USER || { role: 'anonymous', id: null };
       vw.src = 'pages/recent.html?theme=' + state.theme + '&role=' + cu.role + (cu.id ? '&uid=' + encodeURIComponent(cu.id) : '');
       state.topic = null;
